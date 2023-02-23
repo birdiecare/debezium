@@ -11,6 +11,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
+import io.debezium.relational.Key;
 import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.common.config.ConfigDef.Importance;
 import org.apache.kafka.common.config.ConfigDef.Type;
@@ -596,6 +597,17 @@ public class PostgresConnectorConfig extends RelationalDatabaseConnectorConfig {
                             "the current filter configuration (see table/database include/exclude list properties). If the publication already" +
                             " exists, it will be used. i.e CREATE PUBLICATION <publication_name> FOR TABLE <tbl1, tbl2, etc>");
 
+    // TODO: Fill the description of this property
+    public static final Field REPLICA_AUTOSET_TYPE = Field.create("replica.autoset.type")
+            .withDisplayName("Replica Identity Auto Set")
+            .withType(Type.STRING)
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTION_ADVANCED_REPLICATION, 10))
+            .withWidth(Width.LONG)
+            .withImportance(Importance.MEDIUM)
+            .withValidation(PostgresConnectorConfig::validateReplicaAutoSetField)
+            .withDescription(
+                    "TBD");
+
     public static final Field STREAM_PARAMS = Field.create("slot.stream.params")
             .withDisplayName("Optional parameters to pass to the logical decoder when the stream is started.")
             .withType(Type.STRING)
@@ -859,6 +871,7 @@ public class PostgresConnectorConfig extends RelationalDatabaseConnectorConfig {
     private final SnapshotMode snapshotMode;
     private final SchemaRefreshMode schemaRefreshMode;
     private final boolean flushLsnOnSource;
+    private final Map<String, ReplicaIdentity.ReplicaIdentityMode> replicaIdentityMap;
 
     public PostgresConnectorConfig(Configuration config) {
         super(
@@ -877,6 +890,7 @@ public class PostgresConnectorConfig extends RelationalDatabaseConnectorConfig {
         this.snapshotMode = SnapshotMode.parse(config.getString(SNAPSHOT_MODE));
         this.schemaRefreshMode = SchemaRefreshMode.parse(config.getString(SCHEMA_REFRESH_MODE));
         this.flushLsnOnSource = config.getBoolean(SHOULD_FLUSH_LSN_IN_SOURCE_DB);
+        this.replicaIdentityMap = ReplicaIdentity.getReplicaIdentityMode(config.getString(REPLICA_AUTOSET_TYPE));
     }
 
     protected String hostname() {
@@ -976,6 +990,10 @@ public class PostgresConnectorConfig extends RelationalDatabaseConnectorConfig {
         return placeholder.getBytes();
     }
 
+    public Map<String, ReplicaIdentity.ReplicaIdentityMode> getTableToReplicaIdentityMap() {
+        return this.replicaIdentityMap;
+    }
+
     protected int moneyFractionDigits() {
         return getConfig().getInteger(MONEY_FRACTION_DIGITS);
     }
@@ -1071,6 +1089,26 @@ public class PostgresConnectorConfig extends RelationalDatabaseConnectorConfig {
                     + "' is set to 'false', the LSN will not be flushed to the database source and WAL logs will not be cleared. User is expected to handle this outside Debezium.");
         }
         return 0;
+    }
+
+    protected static int validateReplicaAutoSetField(Configuration config, Field field, Field.ValidationOutput problems) {
+        String replica_autoset_values = config.getString(PostgresConnectorConfig.REPLICA_AUTOSET_TYPE);
+        int problemCount = 0;
+
+        if (replica_autoset_values != null) {
+            if (replica_autoset_values.isEmpty()) {
+                problems.accept(PostgresConnectorConfig.REPLICA_AUTOSET_TYPE, "", "Must not be empty");
+            }
+
+            for (String substring : Key.CustomKeyMapper.PATTERN_SPLIT.split(replica_autoset_values)) {
+                if (!ReplicaIdentity.REPLICA_AUTO_SET_PATTERN.asPredicate().test(substring)) {
+                    problems.accept(PostgresConnectorConfig.REPLICA_AUTOSET_TYPE, substring,
+                            substring + " has an invalid format (expecting '" + ReplicaIdentity.REPLICA_AUTO_SET_PATTERN.pattern() + "')");
+                    problemCount++;
+                }
+            }
+        }
+        return problemCount;
     }
 
     @Override
