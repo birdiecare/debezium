@@ -410,6 +410,31 @@ public final class TestHelper {
         }
     }
 
+    public static String getReplicaIdentityForTable(String schemaName, String tableName) {
+        String statement = "SELECT relreplident FROM pg_catalog.pg_class c " +
+                "LEFT JOIN pg_catalog.pg_namespace n ON c.relnamespace=n.oid " +
+                "WHERE n.nspname=? and c.relname=?";
+
+        try (PostgresConnection connection = create()) {
+            StringBuilder replIdentity = new StringBuilder();
+            connection.prepareQuery(statement, stmt -> {
+                stmt.setString(2, tableName);
+                stmt.setString(1, schemaName);
+            }, rs -> {
+                if (rs.next()) {
+                    replIdentity.append(rs.getString(1));
+                }
+                else {
+                    fail(String.format("Cannot determine REPLICA IDENTITY information for table '%s'.'%s'", schemaName, tableName));
+                }
+            });
+            return replIdentity.toString();
+        }
+        catch (SQLException e) {
+            return null;
+        }
+    }
+
     protected static void assertNoOpenTransactions() throws SQLException {
         try (PostgresConnection connection = TestHelper.create()) {
             connection.setAutoCommit(true);
