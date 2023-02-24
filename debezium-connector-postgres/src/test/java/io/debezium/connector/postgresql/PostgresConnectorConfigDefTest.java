@@ -5,11 +5,12 @@
  */
 package io.debezium.connector.postgresql;
 
-import io.debezium.config.ConfigDefinitionMetadataTest;
-import io.debezium.config.Configuration;
+import static org.assertj.core.api.Assertions.assertThat;
+
 import org.junit.Test;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import io.debezium.config.ConfigDefinitionMetadataTest;
+import io.debezium.config.Configuration;
 
 public class PostgresConnectorConfigDefTest extends ConfigDefinitionMetadataTest {
 
@@ -21,12 +22,10 @@ public class PostgresConnectorConfigDefTest extends ConfigDefinitionMetadataTest
     public void shouldSetReplicaAutoSetValidValue() {
 
         Configuration.Builder configBuilder = TestHelper.defaultConfig()
-                        .with(PostgresConnectorConfig.REPLICA_AUTOSET_TYPE, "testSchema_1.testTable_1:FULL;testSchema_2.testTable_2:DEFAULT");
+                .with(PostgresConnectorConfig.REPLICA_AUTOSET_TYPE, "testSchema_1.testTable_1:FULL;testSchema_2.testTable_2:DEFAULT");
 
         int problemCount = PostgresConnectorConfig.validateReplicaAutoSetField(
-                configBuilder.build()
-                , PostgresConnectorConfig.REPLICA_AUTOSET_TYPE
-                , (field,value,problemMessage) -> System.out.println(problemMessage));
+                configBuilder.build(), PostgresConnectorConfig.REPLICA_AUTOSET_TYPE, (field, value, problemMessage) -> System.out.println(problemMessage));
 
         assertThat((problemCount == 0)).isTrue();
     }
@@ -38,9 +37,7 @@ public class PostgresConnectorConfigDefTest extends ConfigDefinitionMetadataTest
                 .with(PostgresConnectorConfig.REPLICA_AUTOSET_TYPE, "testSchema_1.testTable_1,FULL;testSchema_2.testTable_2,,DEFAULT");
 
         int problemCount = PostgresConnectorConfig.validateReplicaAutoSetField(
-                configBuilder.build()
-                , PostgresConnectorConfig.REPLICA_AUTOSET_TYPE
-                , (field,value,problemMessage) -> System.out.println(problemMessage));
+                configBuilder.build(), PostgresConnectorConfig.REPLICA_AUTOSET_TYPE, (field, value, problemMessage) -> System.out.println(problemMessage));
 
         assertThat((problemCount == 2)).isTrue();
     }

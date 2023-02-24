@@ -410,6 +410,57 @@ public final class TestHelper {
         }
     }
 
+//    public static String getReplicaIdentityForTable(String table) {
+//        String replicaIdentityQuery = "SELECT CASE relreplident \n"
+//                + "WHEN 'd' THEN 'default' \n"
+//                + "WHEN 'n' THEN 'nothing' \n"
+//                + "WHEN 'f' THEN 'full' \n"
+//                + "WHEN 'i' THEN 'index' \n"
+//                + "END AS replica_identity \n"
+//                + "FROM pg_class \n"
+//                + "WHERE oid = 's1.a'::regclass;";
+//
+//        String replicaIdentity = "";
+//
+//        try (PostgresConnection connection = create()) {
+//            Awaitility.await().atMost(5, TimeUnit.SECONDS).until(() -> connection
+//                    .prepareQueryAndMap(replicaIdentityQuery, statement -> {
+//                        statement.setString(1, table);
+//                    }, rs -> {
+//                        if (!rs.next()) {
+//                            return false;
+//                        }
+//
+//                        String replicaIdentity = rs.getString("replica_identity");
+//                        return rs.getString() table.toLowerCase().startsWith(rs.getString(1));
+//                    }));
+//        }
+//
+//        try (PostgresConnection connection = create()) {
+//            Awaitility.await().atMost(5, TimeUnit.SECONDS).until(() -> connection
+//                    .prepareQueryAndMap(
+//                        replicaIdentityQuery, statement -> {
+//                                statement.setString(1, table);
+//                            },
+//                    rs -> {
+//                        if (rs.next()) {
+//                            return rs.getString("replica_identity");
+//                        }
+//                        else {
+//                            fail("No replica identity record for table.");
+//                        }
+//                        return null;
+//                    });
+//
+//            return replicaIdentity;
+//        }
+//        catch (SQLException e) {
+////            fail("")
+//        }
+//
+//        return null;
+//    }
+
     protected static void assertNoOpenTransactions() throws SQLException {
         try (PostgresConnection connection = TestHelper.create()) {
             connection.setAutoCommit(true);

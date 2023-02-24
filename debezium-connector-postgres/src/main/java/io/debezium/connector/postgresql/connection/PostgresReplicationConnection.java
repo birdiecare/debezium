@@ -23,7 +23,6 @@ import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import io.debezium.connector.postgresql.ReplicaIdentity;
 import org.apache.kafka.connect.errors.ConnectException;
 import org.postgresql.core.BaseConnection;
 import org.postgresql.core.ServerVersion;
@@ -36,6 +35,7 @@ import org.slf4j.LoggerFactory;
 import io.debezium.DebeziumException;
 import io.debezium.connector.postgresql.PostgresConnectorConfig;
 import io.debezium.connector.postgresql.PostgresSchema;
+import io.debezium.connector.postgresql.ReplicaIdentity;
 import io.debezium.connector.postgresql.TypeRegistry;
 import io.debezium.connector.postgresql.spi.SlotCreationResult;
 import io.debezium.jdbc.JdbcConfiguration;
@@ -215,8 +215,7 @@ public class PostgresReplicationConnection extends JdbcConnection implements Rep
         }
     }
 
-
-    private void initReplicaIdentity () {
+    private void initReplicaIdentity() {
 
         String updateReplicaIdentityStmt;
         String tableFilterString = null;
@@ -232,7 +231,7 @@ public class PostgresReplicationConnection extends JdbcConnection implements Rep
                     String tableName = entry.getKey();
                     ReplicaIdentity.ReplicaIdentityMode replicaIdentityMode = entry.getValue();
 
-                    //Check current replica identity mode for table
+                    // Check current replica identity mode for table
                     String checkReplicaIdentityQuery = "SELECT CASE relreplident \n"
                             + "WHEN 'd' THEN 'default' \n"
                             + "WHEN 'n' THEN 'nothing' \n"
@@ -262,12 +261,14 @@ public class PostgresReplicationConnection extends JdbcConnection implements Rep
                                     updateStmt.execute(updateReplicaIdentity);
 
                                     // TODO: Check if exception is because of a lack of privileges.
-                                } catch (SQLException e) {
+                                }
+                                catch (SQLException e) {
 
                                     throw new JdbcConnectionException(e);
                                 }
 
-                            } else {
+                            }
+                            else {
                                 LOGGER.info("Replica identity for table '{}' is already {}",
                                         tableName, replicaIdentityMode.getValue());
 

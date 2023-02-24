@@ -1,12 +1,13 @@
 package io.debezium.connector.postgresql;
 
-import io.debezium.relational.TableId;
-import org.junit.Test;
+import static org.junit.Assert.assertEquals;
 
 import java.util.HashMap;
 import java.util.Map;
 
-import static org.junit.Assert.assertEquals;
+import org.junit.Test;
+
+import io.debezium.relational.TableId;
 
 public class ReplicaIdentityTest {
 
@@ -18,7 +19,6 @@ public class ReplicaIdentityTest {
         Map<TableId, ReplicaIdentity.ReplicaIdentityMode> expectedMap = new HashMap<>();
         expectedMap.put(new TableId(databaseName, "testSchema_1", "testTable_1"), ReplicaIdentity.ReplicaIdentityMode.FULL);
         expectedMap.put(new TableId(databaseName, "testSchema_2", "testTable_2"), ReplicaIdentity.ReplicaIdentityMode.DEFAULT);
-
 
         String replica_autoset_type_field = "testSchema_1.testTable_1:FULL;testSchema_2.testTable_2:DEFAULT";
 

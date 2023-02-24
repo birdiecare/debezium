@@ -1076,6 +1076,25 @@ public class PostgresConnectorIT extends AbstractConnectorTest {
         assertRecordsAfterInsert(2, 3, 3);
     }
 
+//    @Test
+//    public void shouldUpdateReplicaIdentity() throws Exception {
+//        // Testing.Print.enable();
+//        String setupStmt = SETUP_TABLES_STMT;
+//        TestHelper.execute(setupStmt);
+//        Configuration config = TestHelper.defaultConfig()
+//                .with(PostgresConnectorConfig.SNAPSHOT_MODE, SnapshotMode.NEVER.getValue())
+//                .with(PostgresConnectorConfig.DROP_SLOT_ON_STOP, Boolean.FALSE)
+//                .with(PostgresConnectorConfig.REPLICA_AUTOSET_TYPE, "s1.a:FULL;s2.a:NOTHING")
+//                .build();
+//
+//        start(PostgresConnector.class, config);
+//        assertConnectorIsRunning();
+////        waitForStreamingRunning("postgres", TestHelper.TEST_SERVER);
+//
+//        assertEquals("FULL", TestHelper.getReplicaIdentityForTable("s1.a"));
+//        assertEquals("NOTHING", TestHelper.getReplicaIdentityForTable("s2.a"));
+//    }
+
     @Test
     public void shouldTakeExcludeListFiltersIntoAccount() throws Exception {
         String setupStmt = SETUP_TABLES_STMT +

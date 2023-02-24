@@ -5,15 +5,15 @@
  */
 package io.debezium.connector.postgresql;
 
-import io.debezium.annotation.Immutable;
-import io.debezium.config.EnumeratedValue;
-import io.debezium.relational.TableId;
-
 import java.util.Arrays;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+
+import io.debezium.annotation.Immutable;
+import io.debezium.config.EnumeratedValue;
+import io.debezium.relational.TableId;
 
 /**
  *
@@ -46,11 +46,15 @@ public class ReplicaIdentity {
 
     private final Map<TableId, ReplicaIdentityMode> replicaIdentityMapper;
 
-    public ReplicaIdentity(String databaseName, String replicaAutoSetValue){
+    public ReplicaIdentity(String databaseName, String replicaAutoSetValue) {
         this.replicaIdentityMapper = getReplicaIdentityMapper(databaseName, replicaAutoSetValue);
     }
 
     private static Map<TableId, ReplicaIdentityMode> getReplicaIdentityMapper(String databaseName, String replicaAutoSetValue) {
+
+        if (replicaAutoSetValue == null) {
+            return null;
+        }
 
         return Arrays.stream(PATTERN_SPLIT.split(replicaAutoSetValue))
                 .map(REPLICA_AUTO_SET_PATTERN::matcher)
@@ -60,11 +64,10 @@ public class ReplicaIdentity {
                             String[] tableName = t.group(1).split("\\.");
                             return new TableId(databaseName, tableName[0], tableName[1]);
                         },
-                        t -> ReplicaIdentityMode.valueOf(t.group(2))
-                ));
+                        t -> ReplicaIdentityMode.valueOf(t.group(2))));
     }
 
-    public Map<TableId, ReplicaIdentityMode> getMapper(){
+    public Map<TableId, ReplicaIdentityMode> getMapper() {
         return this.replicaIdentityMapper;
     }
 
