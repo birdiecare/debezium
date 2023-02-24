@@ -1016,6 +1016,7 @@ public class PostgresConnectorConfig extends RelationalDatabaseConnectorConfig {
                     SLOT_NAME,
                     PUBLICATION_NAME,
                     PUBLICATION_AUTOCREATE_MODE,
+                    REPLICA_AUTOSET_TYPE,
                     DROP_SLOT_ON_STOP,
                     STREAM_PARAMS,
                     ON_CONNECT_STATEMENTS,

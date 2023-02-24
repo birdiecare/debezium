@@ -7,10 +7,12 @@ package io.debezium.connector.postgresql;
 
 import io.debezium.annotation.Immutable;
 import io.debezium.config.EnumeratedValue;
-import java.util.HashMap;
+
+import java.util.Arrays;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  *
@@ -42,21 +44,15 @@ public class ReplicaIdentity {
     }
 
 
-    // TODO: Can we improve this method?
     public static Map<String, ReplicaIdentityMode> getReplicaIdentityMode(String replicaAutoSetTypes) {
 
-        Map<String, ReplicaIdentityMode> tableToReplicaIdentity = new HashMap<>();
-
-        for (String substring : PATTERN_SPLIT.split(replicaAutoSetTypes)) {
-            Pattern pattern = Pattern.compile(String.valueOf(REPLICA_AUTO_SET_PATTERN));
-            Matcher matcher = pattern.matcher(substring);
-            if (matcher.find() && (matcher.groupCount() == 2))
-            {
-                tableToReplicaIdentity.put(matcher.group(1), ReplicaIdentityMode.valueOf(matcher.group(2)));
-            }
-        }
-
-        return tableToReplicaIdentity;
+        return Arrays.stream(PATTERN_SPLIT.split(replicaAutoSetTypes))
+                .map(REPLICA_AUTO_SET_PATTERN::matcher)
+                .filter(Matcher::find)
+                .collect(Collectors.toMap(
+                        t -> t.group(1),
+                        t -> ReplicaIdentityMode.valueOf(t.group(2))
+                ));
     }
 
 }
