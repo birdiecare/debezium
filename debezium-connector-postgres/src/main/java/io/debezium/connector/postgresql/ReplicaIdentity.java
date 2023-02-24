@@ -7,6 +7,7 @@ package io.debezium.connector.postgresql;
 
 import io.debezium.annotation.Immutable;
 import io.debezium.config.EnumeratedValue;
+import io.debezium.relational.TableId;
 
 import java.util.Arrays;
 import java.util.Map;
@@ -43,16 +44,28 @@ public class ReplicaIdentity {
         }
     }
 
+    private final Map<TableId, ReplicaIdentityMode> replicaIdentityMapper;
 
-    public static Map<String, ReplicaIdentityMode> getReplicaIdentityMode(String replicaAutoSetTypes) {
+    public ReplicaIdentity(String databaseName, String replicaAutoSetValue){
+        this.replicaIdentityMapper = getReplicaIdentityMapper(databaseName, replicaAutoSetValue);
+    }
 
-        return Arrays.stream(PATTERN_SPLIT.split(replicaAutoSetTypes))
+    private static Map<TableId, ReplicaIdentityMode> getReplicaIdentityMapper(String databaseName, String replicaAutoSetValue) {
+
+        return Arrays.stream(PATTERN_SPLIT.split(replicaAutoSetValue))
                 .map(REPLICA_AUTO_SET_PATTERN::matcher)
                 .filter(Matcher::find)
                 .collect(Collectors.toMap(
-                        t -> t.group(1),
+                        t -> {
+                            String[] tableName = t.group(1).split("\\.");
+                            return new TableId(databaseName, tableName[0], tableName[1]);
+                        },
                         t -> ReplicaIdentityMode.valueOf(t.group(2))
                 ));
+    }
+
+    public Map<TableId, ReplicaIdentityMode> getMapper(){
+        return this.replicaIdentityMapper;
     }
 
 }

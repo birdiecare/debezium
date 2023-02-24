@@ -871,7 +871,7 @@ public class PostgresConnectorConfig extends RelationalDatabaseConnectorConfig {
     private final SnapshotMode snapshotMode;
     private final SchemaRefreshMode schemaRefreshMode;
     private final boolean flushLsnOnSource;
-    private final Map<String, ReplicaIdentity.ReplicaIdentityMode> replicaIdentityMap;
+    private final ReplicaIdentity replicaIdentityMapper;
 
     public PostgresConnectorConfig(Configuration config) {
         super(
@@ -890,7 +890,7 @@ public class PostgresConnectorConfig extends RelationalDatabaseConnectorConfig {
         this.snapshotMode = SnapshotMode.parse(config.getString(SNAPSHOT_MODE));
         this.schemaRefreshMode = SchemaRefreshMode.parse(config.getString(SCHEMA_REFRESH_MODE));
         this.flushLsnOnSource = config.getBoolean(SHOULD_FLUSH_LSN_IN_SOURCE_DB);
-        this.replicaIdentityMap = ReplicaIdentity.getReplicaIdentityMode(config.getString(REPLICA_AUTOSET_TYPE));
+        this.replicaIdentityMapper = new ReplicaIdentity(this.databaseName(), config.getString(REPLICA_AUTOSET_TYPE));
     }
 
     protected String hostname() {
@@ -990,8 +990,8 @@ public class PostgresConnectorConfig extends RelationalDatabaseConnectorConfig {
         return placeholder.getBytes();
     }
 
-    public Map<String, ReplicaIdentity.ReplicaIdentityMode> getTableToReplicaIdentityMap() {
-        return this.replicaIdentityMap;
+    public ReplicaIdentity getTableToReplicaIdentityMap() {
+        return this.replicaIdentityMapper;
     }
 
     protected int moneyFractionDigits() {

@@ -1,5 +1,6 @@
 package io.debezium.connector.postgresql;
 
+import io.debezium.relational.TableId;
 import org.junit.Test;
 
 import java.util.HashMap;
@@ -12,15 +13,17 @@ public class ReplicaIdentityTest {
     @Test
     public void shouldSetReplicaAutoSetValidValue() {
 
-        Map<String, ReplicaIdentity.ReplicaIdentityMode> expectedMap = new HashMap<>();
-        expectedMap.put("testSchema_1.testTable_1", ReplicaIdentity.ReplicaIdentityMode.FULL);
-        expectedMap.put("testSchema_2.testTable_2", ReplicaIdentity.ReplicaIdentityMode.DEFAULT);
+        String databaseName = "database_test";
+
+        Map<TableId, ReplicaIdentity.ReplicaIdentityMode> expectedMap = new HashMap<>();
+        expectedMap.put(new TableId(databaseName, "testSchema_1", "testTable_1"), ReplicaIdentity.ReplicaIdentityMode.FULL);
+        expectedMap.put(new TableId(databaseName, "testSchema_2", "testTable_2"), ReplicaIdentity.ReplicaIdentityMode.DEFAULT);
 
 
         String replica_autoset_type_field = "testSchema_1.testTable_1:FULL;testSchema_2.testTable_2:DEFAULT";
 
-        Map<String, ReplicaIdentity.ReplicaIdentityMode> hashMap = ReplicaIdentity.getReplicaIdentityMode(replica_autoset_type_field);
+        ReplicaIdentity replicaIdentityMapper = new ReplicaIdentity(databaseName, replica_autoset_type_field);
 
-        assertEquals(expectedMap, hashMap);
+        assertEquals(expectedMap, replicaIdentityMapper.getMapper());
     }
 }
