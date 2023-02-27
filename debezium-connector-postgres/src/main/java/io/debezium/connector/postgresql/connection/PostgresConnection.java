@@ -163,6 +163,7 @@ public class PostgresConnection extends JdbcConnection {
      * @return the replica identity information; never null
      * @throws SQLException if there is a problem obtaining the replica identity information for the given table
      */
+    @VisibleForTesting
     public ServerInfo.ReplicaIdentity readReplicaIdentityInfo(TableId tableId) throws SQLException {
         String statement = "SELECT relreplident FROM pg_catalog.pg_class c " +
                 "LEFT JOIN pg_catalog.pg_namespace n ON c.relnamespace=n.oid " +
@@ -181,6 +182,24 @@ public class PostgresConnection extends JdbcConnection {
             }
         });
         return ServerInfo.ReplicaIdentity.parseFromDB(replIdentity.toString());
+    }
+
+    /**
+     * Update REPLICA IDENTITY status of a table.
+     * This in turn determines how much information is available for UPDATE and DELETE operations for logical replication.
+     *
+     * @param tableId the identifier of the table
+     * @param replicaIdentityValue Replica Identity value
+     */
+    public void setReplicaIdentityForTable(TableId tableId, ServerInfo.ReplicaIdentity replicaIdentityValue) {
+        try {
+            LOGGER.debug("Updating Replica Identity '{}'", tableId.table());
+            execute(String.format("ALTER TABLE %s REPLICA IDENTITY %s;", tableId, replicaIdentityValue));
+        }
+        // TODO: Check if exception is because of a lack of privileges.
+        catch (SQLException e) {
+            LOGGER.error("Unexpected error while attempting to alter Replica Identity", e);
+        }
     }
 
     /**

@@ -15,7 +15,11 @@ import java.sql.SQLException;
 import java.sql.SQLWarning;
 import java.sql.Statement;
 import java.time.Duration;
-import java.util.*;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.Optional;
+import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -35,7 +39,7 @@ import org.slf4j.LoggerFactory;
 import io.debezium.DebeziumException;
 import io.debezium.connector.postgresql.PostgresConnectorConfig;
 import io.debezium.connector.postgresql.PostgresSchema;
-import io.debezium.connector.postgresql.ReplicaIdentity;
+import io.debezium.connector.postgresql.ReplicaIdentityMapper;
 import io.debezium.connector.postgresql.TypeRegistry;
 import io.debezium.connector.postgresql.spi.SlotCreationResult;
 import io.debezium.jdbc.JdbcConfiguration;
@@ -73,7 +77,7 @@ public class PostgresReplicationConnection extends JdbcConnection implements Rep
     private SlotCreationResult slotCreationInfo;
     private boolean hasInitedSlot;
 
-    private Map<String, ReplicaIdentity.ReplicaIdentityMode> tableToReplicaIdentityMap;
+    private ReplicaIdentityMapper replicaIdentityMapper;
 
     /**
      * Creates a new replication connection with the given params.
@@ -90,6 +94,7 @@ public class PostgresReplicationConnection extends JdbcConnection implements Rep
      * @param typeRegistry              registry with PostgreSQL types
      * @param streamParams              additional parameters to pass to the replication stream
      * @param schema                    the schema; must not be null
+     * @param replicaIdentityMapper     the type for Replica Identity; may not be null
      *                                  <p>
      *                                  updates to the server
      */
@@ -105,7 +110,7 @@ public class PostgresReplicationConnection extends JdbcConnection implements Rep
                                           TypeRegistry typeRegistry,
                                           Properties streamParams,
                                           PostgresSchema schema,
-                                          Map<String, ReplicaIdentity.ReplicaIdentityMode> tableToReplicaIdentityMap) {
+                                          ReplicaIdentityMapper replicaIdentityMapper) {
         super(addDefaultSettings(config.getJdbcConfig()), PostgresConnection.FACTORY, "\"", "\"");
 
         this.connectorConfig = config;
@@ -122,7 +127,7 @@ public class PostgresReplicationConnection extends JdbcConnection implements Rep
         this.streamParams = streamParams;
         this.slotCreationInfo = null;
         this.hasInitedSlot = false;
-        this.tableToReplicaIdentityMap = tableToReplicaIdentityMap;
+        this.replicaIdentityMapper = replicaIdentityMapper;
     }
 
     private static JdbcConfiguration addDefaultSettings(JdbcConfiguration configuration) {
@@ -215,73 +220,31 @@ public class PostgresReplicationConnection extends JdbcConnection implements Rep
         }
     }
 
+    // TODO: Check if tables are in table.include.list
     private void initReplicaIdentity() {
 
-        String updateReplicaIdentityStmt;
-        String tableFilterString = null;
-        if (PostgresConnectorConfig.LogicalDecoder.PGOUTPUT.equals(plugin)) {
-            LOGGER.info("Initializing PgOutput logical decoder publication");
-            try {
-                // Unless the autocommit is disabled the SELECT publication query will stay running
-                Connection conn = pgConnection();
-                conn.setAutoCommit(false);
+        if (PostgresConnectorConfig.LogicalDecoder.PGOUTPUT.equals(plugin) && this.replicaIdentityMapper != null) {
+            LOGGER.info("Updating Replica Identity");
 
-                for (Map.Entry<String, ReplicaIdentity.ReplicaIdentityMode> entry : this.tableToReplicaIdentityMap.entrySet()) {
-
-                    String tableName = entry.getKey();
-                    ReplicaIdentity.ReplicaIdentityMode replicaIdentityMode = entry.getValue();
-
-                    // Check current replica identity mode for table
-                    String checkReplicaIdentityQuery = "SELECT CASE relreplident \n"
-                            + "WHEN 'd' THEN 'default' \n"
-                            + "WHEN 'n' THEN 'nothing' \n"
-                            + "WHEN 'f' THEN 'full' \n"
-                            + "WHEN 'i' THEN 'index' \n"
-                            + "END AS replica_identity \n"
-                            + "FROM pg_class 'n"
-                            + "WHERE oid = '%s'::regclass;";
-
-                    String checkReplicaIdentity = String.format(checkReplicaIdentityQuery, tableName);
-
-                    try (Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(checkReplicaIdentity)) {
-                        if (rs.next()) {
-
-                            String currentReplicaIdentity = rs.getString("replica_identity");
-                            // Close eagerly as the transaction might stay running
-                            if (currentReplicaIdentity != replicaIdentityMode.getValue().toLowerCase()) {
-
-                                LOGGER.info("Updating replica identity for table '{}' from {} to {}",
-                                        tableName, currentReplicaIdentity, replicaIdentityMode.getValue());
-
-                                final String updateReplicaIdentity = String.format("ALTER TABLE %s REPLICA IDENTITY %s",
-                                        tableName, replicaIdentityMode.getValue());
-
-                                try {
-                                    Statement updateStmt = conn.createStatement();
-                                    updateStmt.execute(updateReplicaIdentity);
-
-                                    // TODO: Check if exception is because of a lack of privileges.
-                                }
-                                catch (SQLException e) {
-
-                                    throw new JdbcConnectionException(e);
-                                }
-
-                            }
-                            else {
-                                LOGGER.info("Replica identity for table '{}' is already {}",
-                                        tableName, replicaIdentityMode.getValue());
-
-                            }
-
-                        }
-                    }
+            this.replicaIdentityMapper.getMapper().forEach((k, v) -> {
+                ServerInfo.ReplicaIdentity replicaIdentity = null;
+                try {
+                    replicaIdentity = jdbcConnection.readReplicaIdentityInfo(k);
                 }
-            }
-            catch (SQLException e) {
+                catch (SQLException e) {
+                    LOGGER.error("Cannot determine REPLICA IDENTITY information for table {}", k.table());
+                }
 
-                throw new JdbcConnectionException(e);
-            }
+                if (replicaIdentity != v) {
+                    jdbcConnection.setReplicaIdentityForTable(k, v);
+                    LOGGER.info("Replica identity set to {} for table '{}'",
+                            v, k);
+                }
+                else {
+                    LOGGER.info("Replica identity for table '{}' is already {}",
+                            k, v);
+                }
+            });
         }
     }
 
@@ -480,6 +443,9 @@ public class PostgresReplicationConnection extends JdbcConnection implements Rep
         // See https://www.postgresql.org/docs/current/logical-replication-quick-setup.html
         // For pgoutput specifically, the publication must be created before the slot.
         initPublication();
+
+        initReplicaIdentity();
+
         if (!hasInitedSlot) {
             initReplicationSlot();
         }
@@ -794,8 +760,7 @@ public class PostgresReplicationConnection extends JdbcConnection implements Rep
         private PostgresSchema schema;
         private Properties slotStreamParams = new Properties();
         private PostgresConnection jdbcConnection;
-
-        private Map<String, ReplicaIdentity.ReplicaIdentityMode> tableToReplicaIdentityMap;
+        private ReplicaIdentityMapper replicaIdentityMapper;
 
         protected ReplicationConnectionBuilder(PostgresConnectorConfig config) {
             assert config != null;
@@ -834,6 +799,13 @@ public class PostgresReplicationConnection extends JdbcConnection implements Rep
         public ReplicationConnectionBuilder withPlugin(final PostgresConnectorConfig.LogicalDecoder plugin) {
             assert plugin != null;
             this.plugin = plugin;
+            return this;
+        }
+
+        @Override
+        public ReplicationConnectionBuilder withReplicaIdentity(ReplicaIdentityMapper replicaIdentityMapper) {
+            assert plugin != null;
+            this.replicaIdentityMapper = replicaIdentityMapper;
             return this;
         }
 
@@ -878,7 +850,7 @@ public class PostgresReplicationConnection extends JdbcConnection implements Rep
             assert plugin != null : "Decoding plugin name is not set";
             return new PostgresReplicationConnection(config, slotName, publicationName, tableFilter,
                     publicationAutocreateMode, plugin, dropSlotOnClose, statusUpdateIntervalVal,
-                    jdbcConnection, typeRegistry, slotStreamParams, schema, tableToReplicaIdentityMap);
+                    jdbcConnection, typeRegistry, slotStreamParams, schema, replicaIdentityMapper);
         }
 
         @Override

@@ -10,6 +10,7 @@ import java.sql.SQLException;
 import java.time.Duration;
 import java.util.Optional;
 
+import io.debezium.connector.postgresql.ReplicaIdentityMapper;
 import org.postgresql.replication.PGReplicationStream;
 
 import io.debezium.annotation.NotThreadSafe;
@@ -149,6 +150,15 @@ public interface ReplicationConnection extends AutoCloseable {
          * @see #PROTOBUF_PLUGIN_NAME
          */
         Builder withPlugin(PostgresConnectorConfig.LogicalDecoder plugin);
+
+        /**
+         * Sets the Replica Identity value
+         *
+         * @param replicaIdentityMapper object, may not be null.
+         * @return this instance
+         * @see #PostgresConnectorConfig.REPLICA_AUTOSET_TYPE
+         */
+        Builder withReplicaIdentity(ReplicaIdentityMapper replicaIdentityMapper);
 
         /**
          * Whether or not to drop the replication slot once the replication connection closes

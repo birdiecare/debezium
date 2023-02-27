@@ -871,7 +871,7 @@ public class PostgresConnectorConfig extends RelationalDatabaseConnectorConfig {
     private final SnapshotMode snapshotMode;
     private final SchemaRefreshMode schemaRefreshMode;
     private final boolean flushLsnOnSource;
-    private final ReplicaIdentity replicaIdentityMapper;
+    private final ReplicaIdentityMapper replicaIdentityMapper;
 
     public PostgresConnectorConfig(Configuration config) {
         super(
@@ -890,7 +890,7 @@ public class PostgresConnectorConfig extends RelationalDatabaseConnectorConfig {
         this.snapshotMode = SnapshotMode.parse(config.getString(SNAPSHOT_MODE));
         this.schemaRefreshMode = SchemaRefreshMode.parse(config.getString(SCHEMA_REFRESH_MODE));
         this.flushLsnOnSource = config.getBoolean(SHOULD_FLUSH_LSN_IN_SOURCE_DB);
-        this.replicaIdentityMapper = new ReplicaIdentity(this.databaseName(), config.getString(REPLICA_AUTOSET_TYPE));
+        this.replicaIdentityMapper = new ReplicaIdentityMapper(this.databaseName(), config.getString(REPLICA_AUTOSET_TYPE));
     }
 
     protected String hostname() {
@@ -990,7 +990,7 @@ public class PostgresConnectorConfig extends RelationalDatabaseConnectorConfig {
         return placeholder.getBytes();
     }
 
-    public ReplicaIdentity getTableToReplicaIdentityMap() {
+    public ReplicaIdentityMapper getTableToReplicaIdentityMap() {
         return this.replicaIdentityMapper;
     }
 
@@ -1102,9 +1102,9 @@ public class PostgresConnectorConfig extends RelationalDatabaseConnectorConfig {
             }
 
             for (String substring : Key.CustomKeyMapper.PATTERN_SPLIT.split(replica_autoset_values)) {
-                if (!ReplicaIdentity.REPLICA_AUTO_SET_PATTERN.asPredicate().test(substring)) {
+                if (!ReplicaIdentityMapper.REPLICA_AUTO_SET_PATTERN.asPredicate().test(substring)) {
                     problems.accept(PostgresConnectorConfig.REPLICA_AUTOSET_TYPE, substring,
-                            substring + " has an invalid format (expecting '" + ReplicaIdentity.REPLICA_AUTO_SET_PATTERN.pattern() + "')");
+                            substring + " has an invalid format (expecting '" + ReplicaIdentityMapper.REPLICA_AUTO_SET_PATTERN.pattern() + "')");
                     problemCount++;
                 }
             }

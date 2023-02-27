@@ -39,6 +39,8 @@ import java.util.stream.IntStream;
 
 import javax.management.InstanceNotFoundException;
 
+import io.debezium.connector.postgresql.connection.*;
+import io.debezium.relational.TableId;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.kafka.common.config.Config;
 import org.apache.kafka.common.config.ConfigDef;
@@ -68,10 +70,6 @@ import io.debezium.config.EnumeratedValue;
 import io.debezium.config.Field;
 import io.debezium.connector.postgresql.PostgresConnectorConfig.LogicalDecoder;
 import io.debezium.connector.postgresql.PostgresConnectorConfig.SnapshotMode;
-import io.debezium.connector.postgresql.connection.AbstractMessageDecoder;
-import io.debezium.connector.postgresql.connection.PostgresConnection;
-import io.debezium.connector.postgresql.connection.PostgresReplicationConnection;
-import io.debezium.connector.postgresql.connection.ReplicationConnection;
 import io.debezium.connector.postgresql.connection.pgoutput.PgOutputMessageDecoder;
 import io.debezium.connector.postgresql.junit.SkipTestDependingOnDecoderPluginNameRule;
 import io.debezium.connector.postgresql.junit.SkipWhenDecoderPluginNameIs;
@@ -1076,24 +1074,37 @@ public class PostgresConnectorIT extends AbstractConnectorTest {
         assertRecordsAfterInsert(2, 3, 3);
     }
 
-//    @Test
-//    public void shouldUpdateReplicaIdentity() throws Exception {
-//        // Testing.Print.enable();
-//        String setupStmt = SETUP_TABLES_STMT;
-//        TestHelper.execute(setupStmt);
-//        Configuration config = TestHelper.defaultConfig()
-//                .with(PostgresConnectorConfig.SNAPSHOT_MODE, SnapshotMode.NEVER.getValue())
-//                .with(PostgresConnectorConfig.DROP_SLOT_ON_STOP, Boolean.FALSE)
-//                .with(PostgresConnectorConfig.REPLICA_AUTOSET_TYPE, "s1.a:FULL;s2.a:NOTHING")
-//                .build();
-//
-//        start(PostgresConnector.class, config);
-//        assertConnectorIsRunning();
-////        waitForStreamingRunning("postgres", TestHelper.TEST_SERVER);
-//
-//        assertEquals("FULL", TestHelper.getReplicaIdentityForTable("s1.a"));
-//        assertEquals("NOTHING", TestHelper.getReplicaIdentityForTable("s2.a"));
-//    }
+    @Test
+    public void shouldUpdateReplicaIdentity() throws Exception {
+
+        // This captures all logged messages, allowing us to verify log message was written.
+        final LogInterceptor logInterceptor = new LogInterceptor(PostgresReplicationConnection.class);
+
+        String setupStmt = SETUP_TABLES_STMT;
+        TestHelper.execute(setupStmt);
+        Configuration config = TestHelper.defaultConfig()
+                .with(PostgresConnectorConfig.SNAPSHOT_MODE, SnapshotMode.NEVER.getValue())
+                .with(PostgresConnectorConfig.DROP_SLOT_ON_STOP, Boolean.FALSE)
+                .with(PostgresConnectorConfig.REPLICA_AUTOSET_TYPE, "s1.a:FULL;s2.a:DEFAULT")
+                .build();
+
+        start(PostgresConnector.class, config);
+        assertConnectorIsRunning();
+
+        waitForStreamingRunning();
+
+        // Waiting for Replica Identity is updated
+        waitForAvailableRecords(5, TimeUnit.SECONDS);
+
+        try (PostgresConnection connection = TestHelper.create()) {
+            TableId tableIds1= new TableId("postgres", "s1", "a");
+            TableId tableIds2= new TableId("postgres", "s2", "a");
+            assertEquals(ServerInfo.ReplicaIdentity.FULL, connection.readReplicaIdentityInfo(tableIds1));
+            assertEquals(ServerInfo.ReplicaIdentity.DEFAULT, connection.readReplicaIdentityInfo(tableIds2));
+            assertThat(logInterceptor.containsMessage(String.format("Replica identity set to FULL for table '%s'", tableIds1))).isTrue();
+            assertThat(logInterceptor.containsMessage(String.format("Replica identity for table '%s' is already DEFAULT", tableIds2))).isTrue();
+        }
+    }
 
     @Test
     public void shouldTakeExcludeListFiltersIntoAccount() throws Exception {

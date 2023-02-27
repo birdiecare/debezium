@@ -12,7 +12,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import io.debezium.annotation.Immutable;
-import io.debezium.config.EnumeratedValue;
+import io.debezium.connector.postgresql.connection.ServerInfo;
 import io.debezium.relational.TableId;
 
 /**
@@ -20,37 +20,18 @@ import io.debezium.relational.TableId;
  * @author Ben White, Miguel Sotomayor
  */
 @Immutable
-public class ReplicaIdentity {
+public class ReplicaIdentityMapper {
 
     public static final Pattern REPLICA_AUTO_SET_PATTERN = Pattern.compile("(?i)^\\s*([^\\s:]+):(DEFAULT|USING INDEX|FULL|NOTHING)\\s*$");
     public static final Pattern PATTERN_SPLIT = Pattern.compile(";");
 
-    public enum ReplicaIdentityMode implements EnumeratedValue {
+    private final Map<TableId, ServerInfo.ReplicaIdentity> replicaIdentityMapper;
 
-        DEFAULT("DEFAULT"),
-        USING_INDEX("USING INDEX"),
-        FULL("FULL"),
-        NOTHING("NOTHING");
-
-        private final String value;
-
-        ReplicaIdentityMode(String value) {
-            this.value = value;
-        }
-
-        @Override
-        public String getValue() {
-            return value;
-        }
-    }
-
-    private final Map<TableId, ReplicaIdentityMode> replicaIdentityMapper;
-
-    public ReplicaIdentity(String databaseName, String replicaAutoSetValue) {
+    public ReplicaIdentityMapper(String databaseName, String replicaAutoSetValue) {
         this.replicaIdentityMapper = getReplicaIdentityMapper(databaseName, replicaAutoSetValue);
     }
 
-    private static Map<TableId, ReplicaIdentityMode> getReplicaIdentityMapper(String databaseName, String replicaAutoSetValue) {
+    private static Map<TableId, ServerInfo.ReplicaIdentity> getReplicaIdentityMapper(String databaseName, String replicaAutoSetValue) {
 
         if (replicaAutoSetValue == null) {
             return null;
@@ -64,10 +45,10 @@ public class ReplicaIdentity {
                             String[] tableName = t.group(1).split("\\.");
                             return new TableId(databaseName, tableName[0], tableName[1]);
                         },
-                        t -> ReplicaIdentityMode.valueOf(t.group(2))));
+                        t -> ServerInfo.ReplicaIdentity.valueOf(t.group(2))));
     }
 
-    public Map<TableId, ReplicaIdentityMode> getMapper() {
+    public Map<TableId, ServerInfo.ReplicaIdentity> getMapper() {
         return this.replicaIdentityMapper;
     }
 
