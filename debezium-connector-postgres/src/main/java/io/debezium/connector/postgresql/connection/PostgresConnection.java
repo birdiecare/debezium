@@ -198,7 +198,13 @@ public class PostgresConnection extends JdbcConnection {
         }
         // TODO: Check if exception is because of a lack of privileges.
         catch (SQLException e) {
-            LOGGER.error("Unexpected error while attempting to alter Replica Identity", e);
+
+            if (e.getSQLState().equals("42501")) {
+                LOGGER.error("Replica identity could not be updated because of lack of privileges", e);
+            }
+            else {
+                LOGGER.error("Unexpected error while attempting to alter Replica Identity", e);
+            }
         }
     }
 

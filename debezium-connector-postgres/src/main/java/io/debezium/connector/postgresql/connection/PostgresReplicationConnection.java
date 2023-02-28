@@ -223,7 +223,7 @@ public class PostgresReplicationConnection extends JdbcConnection implements Rep
     // TODO: Check if tables are in table.include.list
     private void initReplicaIdentity() {
 
-        if (PostgresConnectorConfig.LogicalDecoder.PGOUTPUT.equals(plugin) && this.replicaIdentityMapper != null) {
+        if (PostgresConnectorConfig.LogicalDecoder.PGOUTPUT.equals(plugin) && this.replicaIdentityMapper != null && this.replicaIdentityMapper.getMapper() != null) {
             LOGGER.info("Updating Replica Identity");
 
             this.replicaIdentityMapper.getMapper().forEach((k, v) -> {

@@ -59,6 +59,7 @@ import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TestRule;
+import org.postgresql.util.PSQLException;
 import org.postgresql.util.PSQLState;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -1104,6 +1105,34 @@ public class PostgresConnectorIT extends AbstractConnectorTest {
             assertThat(logInterceptor.containsMessage(String.format("Replica identity set to FULL for table '%s'", tableIds1))).isTrue();
             assertThat(logInterceptor.containsMessage(String.format("Replica identity for table '%s' is already DEFAULT", tableIds2))).isTrue();
         }
+    }
+
+    @Test
+    public void shouldLogOwnershipErrorForReplicaIdentityUpdate() throws Exception {
+
+        // This captures all logged messages, allowing us to verify log message was written.
+        final LogInterceptor logInterceptor = new LogInterceptor(PostgresConnection.class);
+
+        TestHelper.executeDDL("postgres_create_role_specific_tables.ddl");
+
+        Configuration config = TestHelper.defaultConfig()
+                .with(PostgresConnectorConfig.SNAPSHOT_MODE, SnapshotMode.NEVER.getValue())
+                .with(PostgresConnectorConfig.DROP_SLOT_ON_STOP, Boolean.FALSE)
+                .with(PostgresConnectorConfig.REPLICA_AUTOSET_TYPE, "s1.a:FULL;s2.a:DEFAULT")
+                .with(PostgresConnectorConfig.PUBLICATION_AUTOCREATE_MODE, "DISABLED")
+                .with("database.user", "role_2")
+                .with("database.password", "role_2_pass")
+                .build();
+
+        start(PostgresConnector.class, config);
+        assertConnectorIsRunning();
+
+        waitForStreamingRunning();
+
+        // Waiting for Replica Identity is updated
+        waitForAvailableRecords(5, TimeUnit.SECONDS);
+
+        assertThat(logInterceptor.containsMessage(String.format("Replica identity could not be updated because of lack of privileges"))).isTrue();
     }
 
     @Test
