@@ -226,25 +226,40 @@ public class PostgresReplicationConnection extends JdbcConnection implements Rep
         if (PostgresConnectorConfig.LogicalDecoder.PGOUTPUT.equals(plugin) && this.replicaIdentityMapper != null && this.replicaIdentityMapper.getMapper() != null) {
             LOGGER.info("Updating Replica Identity");
 
-            this.replicaIdentityMapper.getMapper().forEach((k, v) -> {
-                ServerInfo.ReplicaIdentity replicaIdentity = null;
-                try {
-                    replicaIdentity = jdbcConnection.readReplicaIdentityInfo(k);
-                }
-                catch (SQLException e) {
-                    LOGGER.error("Cannot determine REPLICA IDENTITY information for table {}", k.table());
-                }
+            try {
+                Set<TableId> tablesToCapture = determineCapturedTables();
 
-                if (replicaIdentity != v) {
-                    jdbcConnection.setReplicaIdentityForTable(k, v);
-                    LOGGER.info("Replica identity set to {} for table '{}'",
-                            v, k);
-                }
-                else {
-                    LOGGER.info("Replica identity for table '{}' is already {}",
-                            k, v);
-                }
-            });
+                this.replicaIdentityMapper.getMapper().forEach((k, v) -> {
+                    ServerInfo.ReplicaIdentity replicaIdentity = null;
+
+                    TableId schemaQualifiedTable = new TableId("", k.schema(), k.table());
+                    if (tablesToCapture.contains(schemaQualifiedTable)) {
+                        try {
+                            replicaIdentity = jdbcConnection.readReplicaIdentityInfo(k);
+                        }
+                        catch (SQLException e) {
+                            LOGGER.error("Cannot determine REPLICA IDENTITY information for table {}", k.table());
+                        }
+
+                        if (replicaIdentity != v) {
+                            jdbcConnection.setReplicaIdentityForTable(k, v);
+                            LOGGER.info("Replica identity set to {} for table '{}'",
+                                    v, k);
+                        }
+                        else {
+                            LOGGER.info("Replica identity for table '{}' is already {}",
+                                    k, v);
+                        }
+                    }
+                    else {
+                        LOGGER.warn("Replica identity for table '{}' will not be updated because it is not in the list of captured tables.", k);
+                    }
+                });
+            }
+            catch (Exception e) {
+                // TODO: Determine correct exception to throw
+                throw new ConnectException(e);
+            }
         }
     }
 
