@@ -1628,8 +1628,8 @@ Disabled by default.
 |[[mongodb-property-skipped-operations]]<<mongodb-property-skipped-operations, `+skipped.operations+`>>
 |`t`
 |A comma-separated list of operation types that will be skipped during streaming.
-The operations include: `c` for inserts/create, `u` for updates, `d` for deletes, `t` for truncates, and `none` to not skip any operations.
-By default, truncate operations are skipped (not emitted by this connector).
+The operations include: `c` for inserts/create, `u` for updates/replace, `d` for deletes, `t` for truncates, and `none` to not skip any aforementioned operations.
+By default, for consistency with other Debezium connectors, truncate operations are skipped (not emitted by this connector). However, since MongoDB https://www.mongodb.com/docs/manual/reference/change-events/#operation-types[does not support] truncate change events, this is effectively the same as specifying `none`.
 
 |[[mongodb-property-snapshot-collection-filter-overrides]]<<mongodb-property-snapshot-collection-filter-overrides, `+snapshot.collection.filter.overrides+`>>
 |No default
@@ -1668,6 +1668,12 @@ A value of `0` disables this behavior.
 |[[mongodb-property-mongodb-server-selection-timeout-ms]]<<mongodb-property-mongodb-server-selection-timeout-ms, `+mongodb.server.selection.timeout.ms+`>>
 |30000 (30 seconds)
 |The number of milliseconds the driver will wait to select a server before it times out and throws an error.
+
+|[[mongodb-property-cursor-pipeline]]<<mongodb-property-cursor-pipeline, `+cursor.pipeline+`>>
+|No default
+|When streaming changes, this setting applies processing to change stream events as part of the standard MongoDB aggregation stream pipeline. A pipeline is a MongoDB aggregation pipeline composed of instructions to the database to filter or transform data. This can be used customize the data that the connector consumes.
+The value of this property must be an array of permitted https://www.mongodb.com/docs/manual/changeStreams/#modify-change-stream-output[aggregation pipeline stages] in JSON format.
+Note that this is appended after the internal pipeline used to support the connector (e.g. filtering operation types, database names, collection names, etc.).
 
 |[[mongodb-property-cursor-max-await-time-ms]]<<mongodb-property-cursor-max-await-time-ms, `+cursor.max.await.time.ms+`>>
 |`0`

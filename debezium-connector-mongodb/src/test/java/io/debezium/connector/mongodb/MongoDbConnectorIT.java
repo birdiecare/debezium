@@ -1549,8 +1549,9 @@ public class MongoDbConnectorIT extends AbstractMongoConnectorIT {
         final Integer monitoredOrd = (Integer) monitoredOffset.get(SourceInfo.ORDER);
         assertThat(records.recordsForTopic("__debezium-heartbeat.mongo")).hasSize(1);
         final Map<String, ?> hbAfterMonitoredOffset = records.recordsForTopic("__debezium-heartbeat.mongo").get(0).sourceOffset();
-        assertThat(monitoredTs).isEqualTo((Integer) hbAfterMonitoredOffset.get(SourceInfo.TIMESTAMP));
-        assertThat(monitoredOrd).isEqualTo((Integer) hbAfterMonitoredOffset.get(SourceInfo.ORDER));
+
+        // Change events are sent on empty cursor `getMore` batches. The first empty batch happens prior to the first monitored event
+        assertThat(monitoredTs).isGreaterThanOrEqualTo((Integer) hbAfterMonitoredOffset.get(SourceInfo.TIMESTAMP));
 
         try (var client = connect()) {
             MongoDatabase db1 = client.getDatabase("dbit");
@@ -1885,6 +1886,36 @@ public class MongoDbConnectorIT extends AbstractMongoConnectorIT {
         if (decimal128Supported) {
             assertSourceRecordKeyFieldIsEqualTo(sourceRecords.get(4), "id", "{\"$numberDecimal\": \"123.45678\"}");
         }
+    }
+
+    @Test
+    public void shouldSkipNonPipelineRecords() throws Exception {
+        config = TestHelper.getConfiguration(mongo).edit()
+                .with(MongoDbConnectorConfig.COLLECTION_INCLUDE_LIST, "dbit.*")
+                .with(MongoDbConnectorConfig.CURSOR_PIPELINE, "[{$match:{'fullDocument.name':'Dennis'}}]")
+                .with(CommonConnectorConfig.TOPIC_PREFIX, "mongo")
+                .build();
+
+        context = new MongoDbTaskContext(config);
+
+        TestHelper.cleanDatabase(mongo, "dbit");
+
+        start(MongoDbConnector.class, config);
+        waitForStreamingRunning("mongodb", "mongo");
+
+        var coll = "c1";
+        insertDocuments("dbit", coll,
+                new Document().append("_id", 1).append("name", "Albert"),
+                new Document().append("_id", 2).append("name", "Bobby"),
+                new Document().append("_id", 3).append("name", "Clyde"),
+                new Document().append("_id", 4).append("name", "Dennis"));
+
+        var records = consumeRecordsByTopic(1);
+        assertThat(records.recordsForTopic("mongo.dbit" + "." + coll))
+                .hasSize(1)
+                .element(0)
+                .satisfies(record -> assertThat(Document.parse(((Struct) record.value()).getString(Envelope.FieldName.AFTER)))
+                        .isEqualTo(Document.parse("{_id:4,name:'Dennis'}")));
     }
 
     private static void assertSourceRecordKeyFieldIsEqualTo(SourceRecord record, String fieldName, String expected) {

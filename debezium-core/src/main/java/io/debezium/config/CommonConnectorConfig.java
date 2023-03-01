@@ -15,7 +15,6 @@ import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
 import java.util.function.Consumer;
-import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -873,13 +872,6 @@ public abstract class CommonConnectorConfig {
         return skippedOperations;
     }
 
-    @Deprecated
-    public Set<String> legacyGetDataCollectionsToBeSnapshotted() {
-        return Optional.ofNullable(config.getString(SNAPSHOT_MODE_TABLES))
-                .map(tables -> Strings.setOf(tables, Function.identity()))
-                .orElseGet(Collections::emptySet);
-    }
-
     public Set<Pattern> getDataCollectionsToBeSnapshotted() {
         return Optional.ofNullable(config.getString(SNAPSHOT_MODE_TABLES))
                 .map(tables -> Strings.setOfRegex(tables, Pattern.CASE_INSENSITIVE))
@@ -925,7 +917,7 @@ public abstract class CommonConnectorConfig {
         return config.validateAndRecord(fields, problems);
     }
 
-    private static int validateMaxQueueSize(Configuration config, Field field, Field.ValidationOutput problems) {
+    private static int validateMaxQueueSize(Configuration config, Field field, ValidationOutput problems) {
         int maxQueueSize = config.getInteger(field);
         int maxBatchSize = config.getInteger(MAX_BATCH_SIZE);
         int count = 0;
@@ -1045,7 +1037,7 @@ public abstract class CommonConnectorConfig {
         return new HeartbeatImpl(getHeartbeatInterval(), topicNamingStrategy.heartbeatTopic(), getLogicalName(), schemaNameAdjuster);
     }
 
-    public static int validateTopicName(Configuration config, Field field, Field.ValidationOutput problems) {
+    public static int validateTopicName(Configuration config, Field field, ValidationOutput problems) {
         String name = config.getString(field);
 
         if (name != null) {
