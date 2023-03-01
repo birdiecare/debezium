@@ -11,7 +11,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
-import io.debezium.relational.Key;
 import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.common.config.ConfigDef.Importance;
 import org.apache.kafka.common.config.ConfigDef.Type;
@@ -40,6 +39,7 @@ import io.debezium.connector.postgresql.snapshot.NeverSnapshotter;
 import io.debezium.connector.postgresql.spi.Snapshotter;
 import io.debezium.jdbc.JdbcConfiguration;
 import io.debezium.relational.ColumnFilterMode;
+import io.debezium.relational.Key;
 import io.debezium.relational.RelationalDatabaseConnectorConfig;
 import io.debezium.relational.TableId;
 import io.debezium.relational.Tables.TableFilter;
@@ -597,7 +597,6 @@ public class PostgresConnectorConfig extends RelationalDatabaseConnectorConfig {
                             "the current filter configuration (see table/database include/exclude list properties). If the publication already" +
                             " exists, it will be used. i.e CREATE PUBLICATION <publication_name> FOR TABLE <tbl1, tbl2, etc>");
 
-    // TODO: Fill the description of this property
     public static final Field REPLICA_AUTOSET_TYPE = Field.create("replica.autoset.type")
             .withDisplayName("Replica Identity Auto Set")
             .withType(Type.STRING)
@@ -606,7 +605,18 @@ public class PostgresConnectorConfig extends RelationalDatabaseConnectorConfig {
             .withImportance(Importance.MEDIUM)
             .withValidation(PostgresConnectorConfig::validateReplicaAutoSetField)
             .withDescription(
-                    "TBD");
+                    "Applies only when streaming changes using pgoutput." +
+                            "Determine the value for Replica Identity at table level. This option will overwrite the existing value in database" +
+                            "A semicolon-separated list of expressions that match fully-qualified tables and replica identity value to be used in the table. " +
+                            "Each expression must match the pattern '<fully-qualified table name>:<replica identity>', " +
+                            "where the table names could be defined as (SCHEMA_NAME.TABLE_NAME), " +
+                            "and the replica identity values are: " +
+                            "DEFAULT - Records the old values of the columns of the primary key, if any. This is the default for non-system tables." +
+                            "INDEX index_name - IRecords the old values of the columns covered by the named index, that must be unique, not partial, not deferrable, " +
+                            "and include only columns marked NOT NULL. If this index is dropped, the behavior is the same as NOTHING." +
+                            "FULL - Records the old values of all columns in the row." +
+                            "NOTHING - Records no information about the old row. This is the default for system tables.");
+
 
     public static final Field STREAM_PARAMS = Field.create("slot.stream.params")
             .withDisplayName("Optional parameters to pass to the logical decoder when the stream is started.")

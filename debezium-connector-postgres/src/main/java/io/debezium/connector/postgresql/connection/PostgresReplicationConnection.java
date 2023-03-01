@@ -220,7 +220,12 @@ public class PostgresReplicationConnection extends JdbcConnection implements Rep
         }
     }
 
-    // TODO: Check if tables are in table.include.list
+    /**
+     * Updating Replica Identity based on REPLICA_AUTOSET_TYPE Configuration parameter
+     *
+     * @return
+     * @throws ConnectException
+     */
     private void initReplicaIdentity() {
 
         if (PostgresConnectorConfig.LogicalDecoder.PGOUTPUT.equals(plugin) && this.replicaIdentityMapper != null && this.replicaIdentityMapper.getMapper() != null) {
@@ -230,19 +235,24 @@ public class PostgresReplicationConnection extends JdbcConnection implements Rep
                 Set<TableId> tablesToCapture = determineCapturedTables();
 
                 this.replicaIdentityMapper.getMapper().forEach((k, v) -> {
-                    ServerInfo.ReplicaIdentity replicaIdentity = null;
+                    ReplicaIdentityMapper.ReplicaIdentityOption replicaIdentityOption = null;
 
                     TableId schemaQualifiedTable = new TableId("", k.schema(), k.table());
                     if (tablesToCapture.contains(schemaQualifiedTable)) {
                         try {
-                            replicaIdentity = jdbcConnection.readReplicaIdentityInfo(k);
+                            ServerInfo.ReplicaIdentity replicaIdentity = jdbcConnection.readReplicaIdentityInfo(k);
+                            replicaIdentityOption = replicaIdentity == ServerInfo.ReplicaIdentity.INDEX ?
+                                    new ReplicaIdentityMapper.ReplicaIdentityOption(replicaIdentity
+                                            , jdbcConnection.readIndexOfReplicaIdentity(k)) :
+                                    new ReplicaIdentityMapper.ReplicaIdentityOption(replicaIdentity);
                         }
                         catch (SQLException e) {
                             LOGGER.error("Cannot determine REPLICA IDENTITY information for table {}", k.table());
                         }
 
-                        if (replicaIdentity != v) {
-                            jdbcConnection.setReplicaIdentityForTable(k, v);
+                        // Updating replica identity when the value is different to the database
+                        if (replicaIdentityOption != null && !replicaIdentityOption.equals(v)) {
+                            jdbcConnection.setReplicaIdentityForTable(k, v.getReplicaIdentity(), v.getIndexName());
                             LOGGER.info("Replica identity set to {} for table '{}'",
                                     v, k);
                         }
@@ -257,8 +267,7 @@ public class PostgresReplicationConnection extends JdbcConnection implements Rep
                 });
             }
             catch (Exception e) {
-                // TODO: Determine correct exception to throw
-                throw new ConnectException(e);
+                throw new ConnectException("Unable to update Replica Identity for tables", e);
             }
         }
     }

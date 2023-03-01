@@ -49,6 +49,8 @@ import io.debezium.relational.Tables;
 import io.debezium.util.Clock;
 import io.debezium.util.Metronome;
 
+import static java.util.Optional.ofNullable;
+
 /**
  * {@link JdbcConnection} connection extension used for connecting to Postgres instances.
  *
@@ -158,6 +160,7 @@ public class PostgresConnection extends JdbcConnection {
     /**
      * Prints out information about the REPLICA IDENTITY status of a table.
      * This in turn determines how much information is available for UPDATE and DELETE operations for logical replication.
+     * This query retrieves information about the INDEX as long as replica identity is configure USING INDEX
      *
      * @param tableId the identifier of the table
      * @return the replica identity information; never null
@@ -185,18 +188,52 @@ public class PostgresConnection extends JdbcConnection {
     }
 
     /**
+     * This query retrieves information about the INDEX as long as replica identity is configure USING INDEX
+     *
+     * @param tableId the identifier of the table
+     * @return Index name linked to replica identity; never null
+     * @throws SQLException if there is a problem obtaining the replica identity and index information for the given table
+     */
+    @VisibleForTesting
+    public String readIndexOfReplicaIdentity(TableId tableId) throws SQLException {
+        String statement = "with rel_index as (" +
+                "select split_part(indexrelid::regclass::text, '.', 1) as index_schema, split_part(indexrelid::regclass::text, '.', 2) as index_name " +
+                "from pg_catalog.pg_index " +
+                "where indisreplident " +
+                ") " +
+                "SELECT i.index_name " +
+                "FROM pg_catalog.pg_class c " +
+                "    LEFT JOIN pg_catalog.pg_namespace n ON c.relnamespace=n.oid " +
+                "    LEFT join rel_index i on n.nspname = i.index_schema " +
+                "WHERE n.nspname=? and c.relname=?";
+        String schema = tableId.schema() != null && tableId.schema().length() > 0 ? tableId.schema() : "public";
+        StringBuilder indexName = new StringBuilder();
+        prepareQuery(statement, stmt -> {
+            stmt.setString(1, schema);
+            stmt.setString(2, tableId.table());
+        }, rs -> {
+            if (rs.next()) {
+                indexName.append(rs.getString(1));
+            }
+            else {
+                LOGGER.warn("Cannot determine index linked to REPLICA IDENTITY for table '{}'", tableId);
+            }
+        });
+        return indexName.toString();
+    }
+
+    /**
      * Update REPLICA IDENTITY status of a table.
      * This in turn determines how much information is available for UPDATE and DELETE operations for logical replication.
      *
      * @param tableId the identifier of the table
      * @param replicaIdentityValue Replica Identity value
      */
-    public void setReplicaIdentityForTable(TableId tableId, ServerInfo.ReplicaIdentity replicaIdentityValue) {
+    public void setReplicaIdentityForTable(TableId tableId, ServerInfo.ReplicaIdentity replicaIdentityValue, String indexName) {
         try {
             LOGGER.debug("Updating Replica Identity '{}'", tableId.table());
-            execute(String.format("ALTER TABLE %s REPLICA IDENTITY %s;", tableId, replicaIdentityValue));
+            execute(String.format("ALTER TABLE %s REPLICA IDENTITY %s %s;", tableId, replicaIdentityValue, ofNullable(indexName).orElse("")));
         }
-        // TODO: Check if exception is because of a lack of privileges.
         catch (SQLException e) {
 
             if (e.getSQLState().equals("42501")) {
@@ -206,6 +243,10 @@ public class PostgresConnection extends JdbcConnection {
                 LOGGER.error("Unexpected error while attempting to alter Replica Identity", e);
             }
         }
+    }
+
+    public void setReplicaIdentityForTable(TableId tableId, ServerInfo.ReplicaIdentity replicaIdentityValue) {
+        setReplicaIdentityForTable(tableId, replicaIdentityValue, null);
     }
 
     /**

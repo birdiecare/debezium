@@ -102,8 +102,14 @@ public class ServerInfo {
         NOTHING("UPDATE and DELETE events will not contain any old values"),
         FULL("UPDATE AND DELETE events will contain the previous values of all the columns"),
         DEFAULT("UPDATE and DELETE events will contain previous values only for PK columns"),
-        INDEX("UPDATE and DELETE events will contain previous values only for columns present in the REPLICA IDENTITY index"),
-        UNKNOWN("Unknown REPLICA IDENTITY");
+        INDEX("UPDATE and DELETE events will contain previous values only for columns present in the REPLICA IDENTITY index") {
+            @Override
+            public String toString() {
+                return "USING INDEX";
+            }
+        },
+        UNKNOWN("Unknown REPLICA IDENTITY")
+        ;
 
         private String description;
 

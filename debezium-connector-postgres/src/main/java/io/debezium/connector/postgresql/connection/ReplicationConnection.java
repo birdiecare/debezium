@@ -10,12 +10,12 @@ import java.sql.SQLException;
 import java.time.Duration;
 import java.util.Optional;
 
-import io.debezium.connector.postgresql.ReplicaIdentityMapper;
 import org.postgresql.replication.PGReplicationStream;
 
 import io.debezium.annotation.NotThreadSafe;
 import io.debezium.connector.postgresql.PostgresConnectorConfig;
 import io.debezium.connector.postgresql.PostgresSchema;
+import io.debezium.connector.postgresql.ReplicaIdentityMapper;
 import io.debezium.connector.postgresql.TypeRegistry;
 import io.debezium.connector.postgresql.spi.SlotCreationResult;
 import io.debezium.relational.RelationalTableFilters;
